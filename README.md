@@ -3,12 +3,12 @@
 
 # Welcome to the Unitree Go2/G1 Digital Twins Project!
 
-[![IsaacSim](https://img.shields.io/badge/IsaacSim-4.0-silver.svg)](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)
+[![IsaacSim](https://img.shields.io/badge/IsaacSim-4.5.0-silver.svg)](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://docs.python.org/3/whatsnew/3.10.html)
 [![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
 [![License](https://img.shields.io/badge/license-BSD--2-yellow.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
-We are thrilled to announce that the Unitree Go2/G1 robot has now been integrated with the Nvidia Isaac Sim 4.2.0 (Isaac Lab), marking a major step forward in robotics research and development. The combination of these two cutting-edge technologies opens up a world of possibilities for creating and testing algorithms in a variety of simulated environments.
+We are thrilled to announce that the Unitree Go2/G1 robot has now been integrated with the Nvidia Isaac Sim 4.5.0 (Isaac Lab), marking a major step forward in robotics research and development. The combination of these two cutting-edge technologies opens up a world of possibilities for creating and testing algorithms in a variety of simulated environments.
 
 Get ready to take your research to the next level with this powerful new resource at your fingertips!
 
@@ -101,26 +101,20 @@ Together, let's push the boundaries of what's possible with the Unitree Go2/G1 a
 ## System requirements
 You need to install:
 1. Ubuntu 22.04
-2. Nvidia Isaac Sim 4.2.0
+2. Nvidia Isaac Sim 4.5.0
 3. Nvidia Isaac Lab
 4. Ros2 Humble
 
 
 Full instruction:
 ```
-https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html
+https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html
 ```
 
 Some suggestions:
-1. You need to check nvidia-smi, it should work, before installing Isaac Sim 4.2.0
+1. You need to check nvidia-smi, it should work, before installing Isaac Sim 4.5.0
 2. You need to install Miniconda and execute: conda config --set auto_activate_base false
-3. Install Omniverse launcher and then install Isaac Sim 4.2.0
-4. Create conda env then activate it, also execute ./isaaclab.sh --install 
-Also, you need to install ROS2 on your system and configure it:
-
-```
-https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_ros.html#isaac-sim-app-install-ros
-```
+3. Isaac Sim 4.5.0 and Isaac Lab installation via *pip* in a virtual enviroment is recommended
 
 ## Downloading the code
 
@@ -130,19 +124,28 @@ To start with the local development environment, clone this repo:
 git clone https://github.com/abizovnuralem/go2_omniverse/ --recurse-submodules -j8 --depth=1
 
 ```
+For the branch *added_copter*:
+```
+git clone -b added_copter https://github.com/abizovnuralem/go2_omniverse/ --recurse-submodules -j8 --depth=1
+```
+
+
 
 ## Setup the Unitree L1 Lidar:
 
-First, you need to copy files from Isaac Sim folder to your local Isaac Sim installation in order to use Unitree L1 lidar inside Orbit.
+First, you need to copy files from Isaac Sim folder to your local Isaac Sim installation in order to use Unitree L1 lidar inside Isaac Lab.
 
-```
-1. You need to replace original file that located in ~/.local/share/ov/pkg/isaac-sim-4.0.0/exts/omni.isaac.sensor/config/extrensiom.toml 
-with Isaac_sim/extension.toml in this repo.
-2. You need to add Unitree_L1.json to IsaacLab repo folder, where IsaacLab/source/exts/omni.isaac.sensor/data/lidar_configs/Unitree/Unitree_L1.json will be the final path (If it doesnt exists, create it)
-```
+
+1. First check the directory of the virtual environment where Isaac Sim was installed. 
+You can do this with ```conda info --envs```
+
+2. Replace original file that located in ```<your conda env dir>/lib/python3.10/site-packages/isaacsim/exts/isaacsim.sensors.rtx/config/extension.toml``` with ```Isaac_sim/extension.toml``` in this repo.
+
+3. You need to add Unitree_L1.json to Isaac Lab repo folder. The final directory should be (if it doesn't exist, create it): ```<your conda env dir>/lib/python3.10/site-packages/isaacsim/exts/isaacsim.sensors.rtx/data/lidar_configs/Unitree/Unitree_L1.json``` 
+
 
 ## Usage
-The current project was tested on Ubuntu 22.04, IsaacSim 4.0 with Isaac Lab and Nvidia Driver Version: 545.
+The current project was tested on Ubuntu 22.04, Isaac Sim 4.5.0 with Isaac Lab and Nvidia Driver Version: 545.
 To start the project with Unitree GO2, execute:
 
 ```

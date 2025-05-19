@@ -57,7 +57,6 @@ def update_meshes_for_cloud2(position_array, origin, rot):
 
 
 def add_rtx_lidar(num_envs, robot_type, debug=False):
-    annotator_lst = []
     for i in range(num_envs):
         if robot_type == "g1":
             lidar_sensor = LidarRtx(
@@ -86,13 +85,9 @@ def add_rtx_lidar(num_envs, robot_type, debug=False):
             writer = rep.writers.get("RtxLidar" + "DebugDrawPointCloudBuffer")
             writer.attach([lidar_texture])
 
-        annotator = rep.AnnotatorRegistry.get_annotator(
-            "RtxSensorCpuIsaacCreateRTXLidarScanBuffer"
-        )
-        annotator.attach(lidar_texture)
-        annotator_lst.append(annotator)
-    return annotator_lst
-
+        writer = rep.writers.get("RtxLidar" + "ROS2PublishPointCloud")
+        writer.initialize(topicName=f"robot{i}/point_cloud2", frameId=f"robot{i}/base_link")
+        writer.attach([lidar_texture])
 
 
 def add_camera(num_envs, robot_type):
@@ -147,51 +142,37 @@ def add_copter_camera():
     Camera(cameraCfg)
 
 
-def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst, start_time):
+def pub_robo_data_ros2(robot_type, num_envs, base_node, env):
 
     for i in range(num_envs):
         # publish ros2 info
         base_node.publish_joints(
-            env.env.scene["robot"].data.joint_names,
-            env.env.scene["robot"].data.joint_pos[i],
+            env.unwrapped.scene["robot"].data.joint_names,
+            env.unwrapped.scene["robot"].data.joint_pos[i],
             i,
         )
         base_node.publish_odom(
-            env.env.scene["robot"].data.root_state_w[i, :3],
-            env.env.scene["robot"].data.root_state_w[i, 3:7],
+            env.unwrapped.scene["robot"].data.root_state_w[i, :3],
+            env.unwrapped.scene["robot"].data.root_state_w[i, 3:7],
             i,
         )
         base_node.publish_imu(
-            env.env.scene["robot"].data.root_state_w[i, 3:7],
-            env.env.scene["robot"].data.root_lin_vel_b[i, :],
-            env.env.scene["robot"].data.root_ang_vel_b[i, :],
+            env.unwrapped.scene["robot"].data.root_state_w[i, 3:7],
+            env.unwrapped.scene["robot"].data.root_lin_vel_b[i, :],
+            env.unwrapped.scene["robot"].data.root_ang_vel_b[i, :],
             i,
         )
 
         if robot_type == "go2":
             base_node.publish_robot_state(
                 [
-                    env.env.scene["contact_forces"].data.net_forces_w[i][4][2],
-                    env.env.scene["contact_forces"].data.net_forces_w[i][8][2],
-                    env.env.scene["contact_forces"].data.net_forces_w[i][14][2],
-                    env.env.scene["contact_forces"].data.net_forces_w[i][18][2],
+                    env.unwrapped.scene["contact_forces"].data.net_forces_w[i][4][2],
+                    env.unwrapped.scene["contact_forces"].data.net_forces_w[i][8][2],
+                    env.unwrapped.scene["contact_forces"].data.net_forces_w[i][14][2],
+                    env.unwrapped.scene["contact_forces"].data.net_forces_w[i][18][2],
                 ],
                 i,
             )
-
-        try:
-            if (time.time() - start_time) > 1 / 20:
-                for j in range(num_envs):
-                    data = annotator_lst[j].get_data()
-                    point_cloud = update_meshes_for_cloud2(
-                        data["data"],
-                        env.env.scene["robot"].data.root_state_w[j, :3],
-                        env.env.scene["robot"].data.root_state_w[j, 3:7],
-                    )
-                    base_node.publish_lidar(point_cloud, j)
-                start_time = time.time()
-        except:
-            pass
 
 
 class RobotBaseNode(Node):
@@ -211,11 +192,6 @@ class RobotBaseNode(Node):
             )
             self.go2_state_pub.append(
                 self.create_publisher(Go2State, f"robot{i}/go2_states", qos_profile)
-            )
-            self.go2_lidar_pub.append(
-                self.create_publisher(
-                    PointCloud2, f"robot{i}/point_cloud2", qos_profile
-                )
             )
             self.odom_pub.append(
                 self.create_publisher(Odometry, f"robot{i}/odom", qos_profile)
