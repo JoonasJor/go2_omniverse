@@ -279,10 +279,6 @@ def run_sim():
     # add N robots to env
     env_cfg.scene.num_envs = args_cli.robot_amount
 
-    # create ros2 camera stream omnigraph
-    for i in range(env_cfg.scene.num_envs):
-        create_front_cam_omnigraph(i)
-
     specify_cmd_for_robots(env_cfg.scene.num_envs)
 
     agent_cfg: RslRlOnPolicyRunnerCfg = unitree_go2_agent_cfg
@@ -323,13 +319,15 @@ def run_sim():
     base_node = RobotBaseNode(env_cfg.scene.num_envs)
     add_cmd_sub(env_cfg.scene.num_envs)
 
-    annotator_lst = add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, False)
+    add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, False)
     add_camera(env_cfg.scene.num_envs, args_cli.robot)
     add_copter_camera()
 
-    setup_custom_env()
+    # create ros2 camera stream omnigraph
+    for i in range(env_cfg.scene.num_envs):
+        create_front_cam_omnigraph(i)
 
-    start_time = time.time()
+    setup_custom_env()
 
     # simulate environment
     while simulation_app.is_running():
@@ -344,8 +342,6 @@ def run_sim():
                 env_cfg.scene.num_envs,
                 base_node,
                 env,
-                annotator_lst,
-                start_time,
             )
             # move_copter(copter)
 
