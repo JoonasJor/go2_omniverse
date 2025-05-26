@@ -27,7 +27,7 @@ import time
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, Vector3, Quaternion
 from tf2_ros import TransformBroadcaster
 from go2_interfaces.msg import Go2State
 from std_msgs.msg import Header
@@ -36,27 +36,31 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2, PointField, Imu
 from sensor_msgs_py import point_cloud2
 
-
 from isaaclab.sensors import CameraCfg, Camera
 import omni.kit.commands
 import omni.replicator.core as rep
-from scipy.spatial.transform import Rotation
 import isaaclab.sim as sim_utils
 
-from pxr import Gf
+from pxr import UsdGeom, UsdPhysics, Gf, Sdf, UsdPhysics
+from tf_transformations import quaternion_from_euler
 
-def update_meshes_for_cloud2(position_array, origin, rot):
+UnitreeL1_translation = (0.293, 0.0, -0.08)
+UnitreeL1_quat = quaternion_from_euler(0, -15 * 3.14159265 / 180, 0) # -15° y axis
 
-    q = rot.cpu().numpy()
-    rotation = Rotation.from_quat([q[1], q[2], q[3], q[0]])
-    rotated_vectors = rotation.apply(position_array)
-    rotated_vectors += origin.cpu().numpy()
-    rotated_vectors += [0.0, 0.0, 0.4]
+ExtraLidar_translation = (0.15, 0.0, 0.18)
+ExtraLidar_quat = quaternion_from_euler(0, 0, 0) 
 
-    return rotated_vectors
-
-
-def add_rtx_lidar(num_envs, robot_type, debug=False):
+def add_rtx_lidar(num_envs, robot_type, lidar_type, debug=False):
+    if lidar_type == "UnitreeL1":
+        trans = UnitreeL1_translation
+        quat = UnitreeL1_quat
+        config = "Unitree_L1"
+    if lidar_type == "Extra":
+        trans = ExtraLidar_translation
+        quat = ExtraLidar_quat
+        config = "Unitree_L1_old"
+    
+    annotator_lst = []
     for i in range(num_envs):
         if robot_type == "g1":
             lidar_sensor = LidarRtx(
@@ -71,24 +75,60 @@ def add_rtx_lidar(num_envs, robot_type, debug=False):
         else:
             _, lidar_sensor = omni.kit.commands.execute(
                 "IsaacSensorCreateRtxLidar",
-                path="/World/envs/env_0/Robot/base/lidar_sensor",
+                path=f"/World/envs/env_{i}/Robot/base/lidar_sensor",
                 parent=None,
-                translation=(0.0, 0.0, 0.4),
-                orientation=Gf.Quatd(1.0, 0.0, 0.0, 0.0),
-                config="Unitree_L1",
+                translation=trans,
+                orientation=Gf.Quatd(quat[3], quat[0], quat[1], quat[2]),
+                config=config,
             )
+            # if lidar_type == "Extra":
+            #     attach_usd_to_sensor(lidar_sensor.GetPath(), "./lidar/os2_mesh.usd")
 
         lidar_texture = rep.create.render_product(lidar_sensor.GetPath(), [1, 1], name="UnitreeL1")
-
         if debug:
             # Create the debug draw pipeline in the post process graph
             writer = rep.writers.get("RtxLidar" + "DebugDrawPointCloudBuffer")
             writer.attach([lidar_texture])
 
-        writer = rep.writers.get("RtxLidar" + "ROS2PublishPointCloud")
-        writer.initialize(topicName=f"robot{i}/point_cloud2", frameId=f"robot{i}/base_link")
-        writer.attach([lidar_texture])
+        # writer = rep.writers.get("RtxLidar" + "ROS2PublishPointCloud")
+        # writer.initialize(topicName=f"robot{i}/point_cloud2", frameId=f"robot{i}/base_link")
+        # writer.attach([lidar_texture])
 
+        annotator = rep.AnnotatorRegistry.get_annotator("RtxSensorCpuIsaacCreateRTXLidarScanBuffer")
+        annotator.attach(lidar_texture)
+
+        annotator_info = {
+            "type": lidar_type,
+            "annotator_object": annotator
+        }
+
+        annotator_lst.append(annotator_info)
+    
+    return annotator_lst
+
+def attach_usd_to_sensor(sensor_path: str, usd_path: str, visible=True):
+    stage = omni.usd.get_context().get_stage()
+    visual_path = f"{sensor_path}/visual"
+    UsdGeom.Xform.Define(stage, Sdf.Path(visual_path))
+    mesh_prim = stage.DefinePrim(Sdf.Path(f"{visual_path}/mesh"), "Xform")
+    mesh_prim.GetReferences().AddReference(usd_path)
+    
+    UsdPhysics.CollisionAPI.Apply(mesh_prim).CreateCollisionEnabledAttr(False)
+    
+    # rt_vis_api = UsdGeom.Tokens
+    mesh_prim.CreateAttribute("visibility:raytracing:camera", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:transmission", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:shadow", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:diffuse", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:glossy", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:specular", Sdf.ValueTypeNames.Token).Set("invisible")
+    mesh_prim.CreateAttribute("visibility:raytracing:scatter", Sdf.ValueTypeNames.Token).Set("invisible")
+
+
+    if visible:
+        path = Sdf.Path(sensor_path)
+        prim = stage.GetPrimAtPath(path)
+        prim.GetAttribute("visibility").Set("inherited")
 
 def add_camera(num_envs, robot_type):
     for i in range(num_envs):
@@ -119,7 +159,6 @@ def add_camera(num_envs, robot_type):
 
         Camera(cameraCfg)
 
-
 def add_copter_camera():
 
     cameraCfg = CameraCfg(
@@ -141,8 +180,7 @@ def add_copter_camera():
 
     Camera(cameraCfg)
 
-
-def pub_robo_data_ros2(robot_type, num_envs, base_node, env):
+def pub_robo_data_ros2(robot_type, num_envs, base_node, env, annotator_lst):
 
     for i in range(num_envs):
         # publish ros2 info
@@ -174,6 +212,14 @@ def pub_robo_data_ros2(robot_type, num_envs, base_node, env):
                 i,
             )
 
+        try:
+            for lidar_id in range(2): 
+                index_annotator = (i * 2) + lidar_id
+                base_node.publish_lidar(annotator_lst[index_annotator], i)
+
+        except Exception as e:
+            print(f"Erro ao publicar LiDAR para o ambiente {i}: {e}")
+
 
 class RobotBaseNode(Node):
     def __init__(self, num_envs):
@@ -182,7 +228,8 @@ class RobotBaseNode(Node):
 
         self.joint_pub = []
         self.go2_state_pub = []
-        self.go2_lidar_pub = []
+        self.go2_lidar_L1_pub = []
+        self.go2_lidar_extra_pub = []
         self.odom_pub = []
         self.imu_pub = []
 
@@ -198,6 +245,16 @@ class RobotBaseNode(Node):
             )
             self.imu_pub.append(
                 self.create_publisher(Imu, f"robot{i}/imu", qos_profile)
+            )
+            self.go2_lidar_L1_pub.append(
+                self.create_publisher(
+                    PointCloud2, f"robot{i}/point_cloud2_L1", qos_profile
+                )
+            )
+            self.go2_lidar_extra_pub.append(
+                self.create_publisher(
+                    PointCloud2, f"robot{i}/point_cloud2_extra", qos_profile
+                )
             )
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
 
@@ -219,8 +276,10 @@ class RobotBaseNode(Node):
         self.joint_pub[robot_num].publish(joint_state)
 
     def publish_odom(self, base_pos, base_rot, robot_num):
+        now = self.get_clock().now().to_msg()
+
         odom_trans = TransformStamped()
-        odom_trans.header.stamp = self.get_clock().now().to_msg()
+        odom_trans.header.stamp = now
         odom_trans.header.frame_id = "odom"
         odom_trans.child_frame_id = f"robot{robot_num}/base_link"
         odom_trans.transform.translation.x = base_pos[0].item()
@@ -232,8 +291,24 @@ class RobotBaseNode(Node):
         odom_trans.transform.rotation.w = base_rot[0].item()
         self.broadcaster.sendTransform(odom_trans)
 
+        UnitreeL1_trans = TransformStamped()
+        UnitreeL1_trans.header.stamp = now
+        UnitreeL1_trans.header.frame_id = f"robot{robot_num}/base_link"
+        UnitreeL1_trans.child_frame_id = f"robot{robot_num}/UnitreeL1_link"
+        UnitreeL1_trans.transform.translation = Vector3(x=UnitreeL1_translation[0], y=UnitreeL1_translation[1], z=UnitreeL1_translation[2])
+        UnitreeL1_trans.transform.rotation = Quaternion(x=UnitreeL1_quat[0], y=UnitreeL1_quat[1], z=UnitreeL1_quat[2], w=UnitreeL1_quat[3])
+        self.broadcaster.sendTransform(UnitreeL1_trans)
+
+        lidar_trans = TransformStamped()
+        lidar_trans.header.stamp = now
+        lidar_trans.header.frame_id = f"robot{robot_num}/base_link"
+        lidar_trans.child_frame_id = f"robot{robot_num}/lidar_link"
+        lidar_trans.transform.translation = Vector3(x=ExtraLidar_translation[0], y=ExtraLidar_translation[1], z=ExtraLidar_translation[2])
+        lidar_trans.transform.rotation = Quaternion(x=ExtraLidar_quat[0], y=ExtraLidar_quat[1], z=ExtraLidar_quat[2], w=ExtraLidar_quat[3])
+        self.broadcaster.sendTransform(lidar_trans)
+
         odom_topic = Odometry()
-        odom_topic.header.stamp = self.get_clock().now().to_msg()
+        odom_topic.header.stamp = now
         odom_topic.header.frame_id = "odom"
         odom_topic.child_frame_id = f"robot{robot_num}/base_link"
         odom_topic.pose.pose.position.x = base_pos[0].item()
@@ -244,7 +319,7 @@ class RobotBaseNode(Node):
         odom_topic.pose.pose.orientation.z = base_rot[3].item()
         odom_topic.pose.pose.orientation.w = base_rot[0].item()
         self.odom_pub[robot_num].publish(odom_topic)
-
+        
     def publish_imu(self, base_rot, base_lin_vel, base_ang_vel, robot_num):
         imu_trans = Imu()
         imu_trans.header.stamp = self.get_clock().now().to_msg()
@@ -276,17 +351,25 @@ class RobotBaseNode(Node):
         ]
         self.go2_state_pub[robot_num].publish(go2_state)
 
-    def publish_lidar(self, points, robot_num):
+    def publish_lidar(self, data, robot_num):
+        points = data["annotator_object"].get_data()["data"]
 
         point_cloud = PointCloud2()
-        point_cloud.header = Header(frame_id="odom")
+        if data["type"] == "UnitreeL1":
+            point_cloud.header = Header(frame_id=f"robot{robot_num}/UnitreeL1_link")
+            publisher = self.go2_lidar_L1_pub[robot_num]
+        elif data["type"] == "Extra":
+            point_cloud.header = Header(frame_id=f"robot{robot_num}/lidar_link")
+            publisher = self.go2_lidar_extra_pub[robot_num]
+
+        point_cloud.header.stamp = self.get_clock().now().to_msg()
         fields = [
             PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
             PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
             PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
         ]
         point_cloud = point_cloud2.create_cloud(point_cloud.header, fields, points)
-        self.go2_lidar_pub[robot_num].publish(point_cloud)
+        publisher.publish(point_cloud)
 
     async def run(self):
         while True:

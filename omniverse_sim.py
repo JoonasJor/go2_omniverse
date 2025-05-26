@@ -60,7 +60,7 @@ parser.add_argument(
     "--seed", type=int, default=None, help="Seed used for the environment"
 )
 parser.add_argument(
-    "--custom_env", type=str, default="office", help="Setup the environment"
+    "--custom_env", type=str, default="", help="Setup the environment"
 )
 parser.add_argument("--robot", type=str, default="go2", help="Setup the robot")
 parser.add_argument(
@@ -119,7 +119,7 @@ from ros2 import (
     add_camera,
     add_copter_camera,
     add_rtx_lidar,
-    pub_robo_data_ros2,
+    pub_robo_data_ros2
 )
 from geometry_msgs.msg import Twist
 
@@ -299,7 +299,6 @@ def run_sim():
     resume_path = get_checkpoint_path(
         log_root_path, agent_cfg["load_run"], agent_cfg["load_checkpoint"]
     )
-    print(f"[INFO]: Loading model checkpoint from: {resume_path}")
 
     # load previously trained model
     ppo_runner = OnPolicyRunner(
@@ -319,9 +318,11 @@ def run_sim():
     base_node = RobotBaseNode(env_cfg.scene.num_envs)
     add_cmd_sub(env_cfg.scene.num_envs)
 
-    add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, False)
+    UnitreeL1_annotator_lst = add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, "UnitreeL1", False)
+    ExtraLidar_annotator_lst = add_rtx_lidar(env_cfg.scene.num_envs, args_cli.robot, "Extra", False)
+    annotator_lst = UnitreeL1_annotator_lst + ExtraLidar_annotator_lst
     add_camera(env_cfg.scene.num_envs, args_cli.robot)
-    add_copter_camera()
+    # add_copter_camera()
 
     # create ros2 camera stream omnigraph
     for i in range(env_cfg.scene.num_envs):
@@ -342,7 +343,9 @@ def run_sim():
                 env_cfg.scene.num_envs,
                 base_node,
                 env,
+                annotator_lst,
             )
             # move_copter(copter)
 
     env.close()
+
