@@ -45,7 +45,7 @@ from pxr import UsdGeom, UsdPhysics, Gf, Sdf, UsdPhysics
 from tf_transformations import quaternion_from_euler
 
 UnitreeL1_translation = (0.293, 0.0, -0.08)
-UnitreeL1_quat = quaternion_from_euler(0, -15 * 3.14159265 / 180, 0) # -15° y axis
+UnitreeL1_quat = quaternion_from_euler(0, 165 * 3.14159265 / 180, 0) # 165° y axis
 
 ExtraLidar_translation = (0.15, 0.0, 0.18)
 ExtraLidar_quat = quaternion_from_euler(0, 0, 0) 
