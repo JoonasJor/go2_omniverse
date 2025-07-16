@@ -1,0 +1,3 @@
+docker run -it --runtime=nvidia --gpus all go2_omniverse
+docker build -t go2_omniverse --build-arg CACHE_BUST=$RANDOM .
+
