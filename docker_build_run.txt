@@ -1,0 +1,40 @@
+
+Prerequisites:
+-Docker
+-NVIDIA container toolkit
+Instructions: https://docs.isaacsim.omniverse.nvidia.com/4.5.0/installation/install_container.html
+
+Install:
+git clone https://github.com/abizovnuralem/go2_omniverse/ --recurse-submodules -j8 --depth=1
+
+cd go2_omniverse
+
+git clone --branch v0.3.1 https://github.com/isaac-sim/IsaacLab.git
+
+docker build -t go2_omniverse_main .
+
+Run:
+xhost +local:docker
+
+docker run \
+    --runtime=nvidia \
+    --gpus all \
+    --volume /tmp/.X11-unix:/tmp/.X11-unix \
+    --device /dev/dri \
+    --entrypoint bash \
+    -e DISPLAY=$DISPLAY \
+    -e LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH \
+    -e "ACCEPT_EULA=Y" \
+    -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
+    -v ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
+    -v ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
+    -v ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
+    -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+    -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+    -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
+    -v ~/docker/isaac-sim/documents:/root/Documents:rw \
+    -it go2_omniverse_main
+
+conda activate orbit
+
+./run_sim.sh
