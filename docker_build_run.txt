@@ -1,3 +1,11 @@
-docker run -it --runtime=nvidia --gpus all go2_omniverse
 docker build -t go2_omniverse --build-arg CACHE_BUST=$RANDOM .
 
+docker run \
+    --runtime=nvidia \
+    --gpus all \
+    -e DISPLAY=$DISPLAY \
+    --volume /tmp/.X11-unix:/tmp/.X11-unix \
+    --device /dev/dri \
+    --network=host \
+    -e LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH \
+    -it go2_omniverse
