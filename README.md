@@ -1,3 +1,7 @@
+## Fork
+- Added dockerfile  
+Instructions in docker_build_run.txt
+
 ![Digital Twins](https://github.com/abizovnuralem/go2_ros2_sdk/assets/33475993/ddbe30ab-21d1-46fd-b44b-198efba92771)
 
 
